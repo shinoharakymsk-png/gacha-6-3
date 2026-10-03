@@ -19,7 +19,6 @@ import {
 import { checkFeverStatus, FeverStatus } from '@/lib/fever';
 import { Navbar } from '@/components/Navbar';
 import { DailyFortuneModal } from '@/components/DailyFortuneModal';
-import { SupabaseSettingsModal } from '@/components/SupabaseSettingsModal';
 import { WeatherBackground } from '@/components/WeatherBackground';
 import {
   Play,
@@ -50,7 +49,6 @@ export default function HomePage() {
 
   // モーダル
   const [isFortuneModalOpen, setIsFortuneModalOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [dailyBonusClaimedMsg, setDailyBonusClaimedMsg] = useState(false);
 
   useEffect(() => {
@@ -102,10 +100,7 @@ export default function HomePage() {
       {/* リアルタイム動的背景 */}
       <WeatherBackground />
 
-      <Navbar
-        onOpenFortune={() => setIsFortuneModalOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      />
+      <Navbar onOpenFortune={() => setIsFortuneModalOpen(true)} />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 w-full flex-1 space-y-8">
         {/* 出席シール ＆ ログインボーナス通知 */}
@@ -533,8 +528,6 @@ export default function HomePage() {
           setFortuneHistory(getFortuneHistory());
         }}
       />
-
-      <SupabaseSettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 }

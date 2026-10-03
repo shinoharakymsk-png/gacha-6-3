@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { WeatherType, TimeOfDay, LocationOption } from '@/types';
-import { Globe, Sliders, Check } from 'lucide-react';
+import { Globe, Sliders, Check, Sun, Moon, Cloud, CloudRain, Snowflake, Flower2, Leaf, Sparkles, X, RotateCcw } from 'lucide-react';
 
 // 日本の47都道府県 ＋ 世界の主要都市
-const LOCATIONS: LocationOption[] = [
+export const LOCATIONS: LocationOption[] = [
   // 北海道・東北
   { id: 'hokkaido', name: '北海道 (札幌)', country: '日本', timezoneOffset: 9, defaultWeather: 'snow' },
   { id: 'aomori', name: '青森県', country: '日本', timezoneOffset: 9, defaultWeather: 'snow' },
@@ -76,13 +76,14 @@ const LOCATIONS: LocationOption[] = [
 ];
 
 export const WeatherBackground: React.FC = () => {
-  const [selectedLocation, setSelectedLocation] = useState<LocationOption>(LOCATIONS[7]); // デフォルト: 東京都
+  const [selectedLocation, setSelectedLocation] = useState<LocationOption>(LOCATIONS[7]); // 東京都
   const [currentWeather, setCurrentWeather] = useState<WeatherType>('sunny');
   const [currentTimeOfDay, setCurrentTimeOfDay] = useState<TimeOfDay>('day');
+  const [isManualOverride, setIsManualOverride] = useState(false);
   const [isOpenControl, setIsOpenControl] = useState(false);
 
+  // 初回マウント時: ストレージから設定復元
   useEffect(() => {
-    // ローカルストレージから前回の地域選択を復元
     if (typeof window !== 'undefined') {
       const savedLocId = localStorage.getItem('user_weather_location');
       if (savedLocId) {
@@ -92,13 +93,18 @@ export const WeatherBackground: React.FC = () => {
     }
   }, []);
 
+  // 地域やタイマーに応じたリアルタイム天候・時間帯計算
   useEffect(() => {
-    updateTimeAndWeather(selectedLocation);
-    const timer = setInterval(() => {
+    if (!isManualOverride) {
       updateTimeAndWeather(selectedLocation);
+    }
+    const timer = setInterval(() => {
+      if (!isManualOverride) {
+        updateTimeAndWeather(selectedLocation);
+      }
     }, 60000);
     return () => clearInterval(timer);
-  }, [selectedLocation]);
+  }, [selectedLocation, isManualOverride]);
 
   const updateTimeAndWeather = (loc: LocationOption) => {
     const now = new Date();
@@ -129,123 +135,374 @@ export const WeatherBackground: React.FC = () => {
 
   const handleSelectLocation = (loc: LocationOption) => {
     setSelectedLocation(loc);
+    setIsManualOverride(false);
     updateTimeAndWeather(loc);
     if (typeof window !== 'undefined') {
       localStorage.setItem('user_weather_location', loc.id);
     }
   };
 
-  const timeBackgrounds: Record<TimeOfDay, string> = {
-    morning: 'from-amber-100/40 via-sky-100/50 to-orange-100/30',
-    day: 'from-sky-50/60 via-amber-50/40 to-blue-50/40',
-    evening: 'from-orange-200/50 via-rose-200/40 to-purple-300/30',
-    night: 'from-slate-900/10 via-indigo-950/15 to-slate-900/20',
+  // 星々のシードデータ（再レンダリングでも位置が変わらないようメモ化）
+  const stars = useMemo(() => {
+    return Array.from({ length: 90 }).map((_, i) => ({
+      id: i,
+      top: `${(i * 13.7) % 85}%`,
+      left: `${(i * 23.3) % 98}%`,
+      size: `${1 + (i % 3) * 0.9}px`,
+      opacity: 0.35 + (i % 5) * 0.15,
+      delay: `${(i % 12) * 0.4}s`,
+      duration: `${2 + (i % 4) * 0.8}s`,
+    }));
+  }, []);
+
+  // 光の微粒子（晴れ）
+  const sunMotes = useMemo(() => {
+    return Array.from({ length: 24 }).map((_, i) => ({
+      id: i,
+      top: `${15 + ((i * 19) % 70)}%`,
+      left: `${(i * 17) % 95}%`,
+      size: `${3 + (i % 4) * 2}px`,
+      duration: `${4 + (i % 5)}s`,
+      delay: `${(i % 7) * 0.5}s`,
+    }));
+  }, []);
+
+  // SSS品質：大気散乱シミュレーションによる空のグラデーション
+  const getSkyGradient = () => {
+    switch (currentTimeOfDay) {
+      case 'morning':
+        // 朝焼け：藍色から暁の茜色・琥珀色・光輝
+        return 'linear-gradient(180deg, #18153d 0%, #2f275e 25%, #6a3568 45%, #b4434b 65%, #e86d3b 80%, #fed166 100%)';
+      case 'day':
+        // 昼：吸い込まれるコバルトブルーから澄み渡る青空、地平線の霞
+        return 'linear-gradient(180deg, #0284c7 0%, #0ea5e9 30%, #38bdf8 65%, #bae6fd 100%)';
+      case 'evening':
+        // 夕焼け：紫紺から紅蓮、燃えるような茜色・夕映え
+        return 'linear-gradient(180deg, #270e4f 0%, #4a154b 22%, #831843 45%, #c2410c 70%, #f97316 85%, #fde047 100%)';
+      case 'night':
+      default:
+        // 夜：深宇宙の漆黒から濃紺・吸い込まれるようなリアルな夜空
+        return 'linear-gradient(180deg, #020617 0%, #060c23 35%, #0b1437 70%, #111d4a 100%)';
+    }
   };
 
   return (
     <>
-      {/* 1. 背景レイヤー（最背面 z-[-1]、ポインターイベント無効） */}
-      <div className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden transition-colors duration-1000">
-        <div className={`absolute inset-0 bg-gradient-to-b ${timeBackgrounds[currentTimeOfDay]}`} />
+      {/* =========================================================
+          1. SSS品質 リアル空・天体・天候レイヤー（最背面固定）
+          ========================================================= */}
+      <div
+        className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden transition-all duration-1000"
+        style={{ background: getSkyGradient() }}
+      >
+        {/* ----------------- 天の川（夜空の星雲） ----------------- */}
+        {currentTimeOfDay === 'night' && (
+          <div
+            className="absolute inset-0 opacity-25 transform -rotate-12 scale-125"
+            style={{
+              background:
+                'radial-gradient(ellipse at 50% 40%, rgba(199, 210, 254, 0.3) 0%, rgba(147, 197, 253, 0.15) 30%, transparent 70%)',
+              filter: 'blur(35px)',
+            }}
+          />
+        )}
 
-        {/* 雨 */}
-        {currentWeather === 'rain' && (
-          <div className="absolute inset-0 opacity-40">
-            <div className="rain-container">
-              {Array.from({ length: 40 }).map((_, i) => (
+        {/* ----------------- 無数の星々（夜・朝方） ----------------- */}
+        {(currentTimeOfDay === 'night' || currentTimeOfDay === 'morning') && (
+          <div className="absolute inset-0">
+            {stars.map((star) => (
+              <div
+                key={star.id}
+                className="absolute rounded-full bg-white shadow-sm"
+                style={{
+                  top: star.top,
+                  left: star.left,
+                  width: star.size,
+                  height: star.size,
+                  opacity: star.opacity,
+                  animation: `pulse ${star.duration} ease-in-out ${star.delay} infinite`,
+                  boxShadow: `0 0 6px rgba(255, 255, 255, ${star.opacity})`,
+                }}
+              />
+            ))}
+
+            {/* 流星（流れ星） */}
+            {currentTimeOfDay === 'night' && (
+              <>
                 <div
-                  key={i}
-                  className="rain-drop"
-                  style={{
-                    left: `${(i * 2.5) % 100}%`,
-                    animationDuration: `${0.6 + (i % 5) * 0.15}s`,
-                    animationDelay: `${(i % 10) * 0.1}s`,
-                  }}
+                  className="shooting-star-line"
+                  style={{ top: '14%', right: '15%', animationDelay: '1.5s', animationDuration: '7s' }}
                 />
-              ))}
+                <div
+                  className="shooting-star-line"
+                  style={{ top: '32%', right: '40%', animationDelay: '5s', animationDuration: '9s' }}
+                />
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ----------------- 太陽（昼・朝・夕方） ----------------- */}
+        {currentTimeOfDay !== 'night' && (
+          <div
+            className={`absolute transition-all duration-1000 ${
+              currentTimeOfDay === 'day'
+                ? 'top-8 right-[18%] sm:right-[22%]'
+                : currentTimeOfDay === 'morning'
+                ? 'bottom-32 left-[12%] sm:left-[18%]'
+                : 'bottom-24 right-[12%] sm:right-[16%]'
+            }`}
+          >
+            {/* 太陽の光冠・ゴッドレイ（光線） */}
+            <div
+              className="absolute -inset-24 rounded-full animate-god-rays opacity-30"
+              style={{
+                background:
+                  currentTimeOfDay === 'evening'
+                    ? 'conic-gradient(from 0deg, transparent 0deg, rgba(251, 146, 60, 0.4) 30deg, transparent 60deg, rgba(254, 215, 170, 0.4) 120deg, transparent 180deg, rgba(251, 146, 60, 0.4) 240deg, transparent 300deg)'
+                    : 'conic-gradient(from 0deg, transparent 0deg, rgba(255, 255, 255, 0.4) 30deg, transparent 60deg, rgba(254, 240, 138, 0.4) 120deg, transparent 180deg, rgba(255, 255, 255, 0.4) 240deg, transparent 300deg)',
+                filter: 'blur(10px)',
+              }}
+            />
+
+            {/* 太陽の外層オーラ */}
+            <div
+              className="absolute -inset-16 rounded-full animate-sun-corona"
+              style={{
+                background:
+                  currentTimeOfDay === 'evening'
+                    ? 'radial-gradient(circle, rgba(249, 115, 22, 0.7) 0%, rgba(234, 88, 12, 0.3) 50%, transparent 80%)'
+                    : 'radial-gradient(circle, rgba(254, 240, 138, 0.8) 0%, rgba(253, 224, 71, 0.35) 50%, transparent 80%)',
+                filter: 'blur(16px)',
+              }}
+            />
+
+            {/* 太陽本体 */}
+            <div
+              className={`relative rounded-full shadow-2xl ${
+                currentTimeOfDay === 'evening'
+                  ? 'w-24 h-24 sm:w-28 sm:h-28 bg-gradient-to-tr from-red-500 via-orange-400 to-amber-300'
+                  : 'w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-tr from-amber-100 via-yellow-200 to-white'
+              }`}
+              style={{
+                boxShadow:
+                  currentTimeOfDay === 'evening'
+                    ? '0 0 50px rgba(249, 115, 22, 0.9), 0 0 100px rgba(239, 68, 68, 0.6)'
+                    : '0 0 60px rgba(254, 240, 138, 1), 0 0 120px rgba(253, 224, 71, 0.8)',
+              }}
+            />
+          </div>
+        )}
+
+        {/* ----------------- 月（夜・黄昏） ----------------- */}
+        {currentTimeOfDay === 'night' && (
+          <div className="absolute top-12 right-[15%] sm:right-[20%] transition-all duration-1000">
+            {/* 月の青白い光芒（月暈） */}
+            <div
+              className="absolute -inset-20 rounded-full animate-moon-halo"
+              style={{
+                background: 'radial-gradient(circle, rgba(186, 230, 253, 0.4) 0%, rgba(147, 197, 253, 0.15) 50%, transparent 75%)',
+                filter: 'blur(20px)',
+              }}
+            />
+
+            {/* 月本体（クレーター陰影を施したリアルな月球） */}
+            <div
+              className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-tr from-slate-200 via-slate-100 to-amber-50 shadow-2xl overflow-hidden"
+              style={{
+                boxShadow: '0 0 35px rgba(224, 242, 254, 0.9), 0 0 70px rgba(186, 230, 253, 0.5)',
+              }}
+            >
+              {/* 月のクレーター・海の模様 */}
+              <div className="absolute top-3 left-4 w-5 h-5 rounded-full bg-slate-300/40 blur-[1px]" />
+              <div className="absolute top-8 left-9 w-7 h-7 rounded-full bg-slate-300/35 blur-[1px]" />
+              <div className="absolute bottom-4 left-6 w-8 h-8 rounded-full bg-slate-300/30 blur-[1.5px]" />
+              <div className="absolute bottom-7 right-3 w-4 h-4 rounded-full bg-slate-300/45 blur-[1px]" />
             </div>
           </div>
         )}
 
-        {/* 雪 */}
+        {/* ----------------- 多層リアル雲レイヤー ----------------- */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {/* 奥の雲レイヤー（ゆっくり） */}
+          <div className="absolute -top-10 -left-[10%] w-[120%] h-64 animate-cloud-slow opacity-60">
+            <svg viewBox="0 0 1000 300" className="w-full h-full preserve-3d" fill="none">
+              <path
+                d="M 50,150 Q 80,100 150,110 Q 200,60 280,80 Q 350,50 420,90 Q 480,60 550,80 Q 620,40 700,70 Q 770,50 830,90 Q 900,80 950,130 Q 980,170 950,210 Q 900,240 820,230 Q 750,260 670,240 Q 580,270 500,240 Q 420,260 350,230 Q 260,250 180,220 Q 100,240 50,200 Z"
+                fill={
+                  currentTimeOfDay === 'evening'
+                    ? 'url(#eveningCloudGradFar)'
+                    : currentTimeOfDay === 'morning'
+                    ? 'url(#morningCloudGradFar)'
+                    : currentTimeOfDay === 'night'
+                    ? 'url(#nightCloudGradFar)'
+                    : 'url(#dayCloudGradFar)'
+                }
+              />
+              <defs>
+                <linearGradient id="dayCloudGradFar" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />
+                  <stop offset="100%" stopColor="#e0f2fe" stopOpacity="0.4" />
+                </linearGradient>
+                <linearGradient id="eveningCloudGradFar" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#fbcfe8" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="#c2410c" stopOpacity="0.5" />
+                </linearGradient>
+                <linearGradient id="morningCloudGradFar" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#fef08a" stopOpacity="0.85" />
+                  <stop offset="100%" stopColor="#f472b6" stopOpacity="0.4" />
+                </linearGradient>
+                <linearGradient id="nightCloudGradFar" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#1e293b" stopOpacity="0.6" />
+                  <stop offset="100%" stopColor="#0f172a" stopOpacity="0.3" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+
+          {/* 手前の雲レイヤー（立体感） */}
+          <div className="absolute top-16 -left-[5%] w-[115%] h-72 animate-cloud-fast opacity-75">
+            <svg viewBox="0 0 1000 300" className="w-full h-full" fill="none">
+              <path
+                d="M 80,180 Q 120,120 200,130 Q 260,80 340,100 Q 420,60 500,100 Q 580,70 650,90 Q 730,50 820,85 Q 890,70 940,120 Q 980,170 940,220 Q 880,260 780,240 Q 700,270 600,250 Q 500,280 400,250 Q 300,270 200,240 Q 120,250 80,210 Z"
+                fill={
+                  currentTimeOfDay === 'evening'
+                    ? 'url(#eveningCloudGradNear)'
+                    : currentTimeOfDay === 'morning'
+                    ? 'url(#morningCloudGradNear)'
+                    : currentTimeOfDay === 'night'
+                    ? 'url(#nightCloudGradNear)'
+                    : 'url(#dayCloudGradNear)'
+                }
+              />
+              <defs>
+                <linearGradient id="dayCloudGradNear" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+                  <stop offset="100%" stopColor="#bae6fd" stopOpacity="0.6" />
+                </linearGradient>
+                <linearGradient id="eveningCloudGradNear" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#fef08a" stopOpacity="0.9" />
+                  <stop offset="50%" stopColor="#fb7185" stopOpacity="0.75" />
+                  <stop offset="100%" stopColor="#7c2d12" stopOpacity="0.6" />
+                </linearGradient>
+                <linearGradient id="morningCloudGradNear" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+                  <stop offset="60%" stopColor="#fed7aa" stopOpacity="0.7" />
+                  <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.5" />
+                </linearGradient>
+                <linearGradient id="nightCloudGradNear" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#334155" stopOpacity="0.7" />
+                  <stop offset="100%" stopColor="#020617" stopOpacity="0.4" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+        </div>
+
+        {/* ----------------- リアル天候エフェクト（絵文字完全排除） ----------------- */}
+
+        {/* 雨 ＆ 稲妻 */}
+        {currentWeather === 'rain' && (
+          <div className="absolute inset-0">
+            {/* 稲妻閃光フラッシュ */}
+            <div className="absolute inset-0 bg-white animate-lightning pointer-events-none" />
+
+            {/* 雨滴（雨筋） */}
+            {Array.from({ length: 55 }).map((_, i) => (
+              <div
+                key={i}
+                className="real-rain-drop"
+                style={{
+                  left: `${(i * 1.85) % 100}%`,
+                  animationDuration: `${0.45 + (i % 6) * 0.08}s`,
+                  animationDelay: `${(i % 12) * 0.05}s`,
+                  opacity: 0.5 + (i % 4) * 0.15,
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* リアル雪（粉雪・結晶粒子） */}
         {currentWeather === 'snow' && (
-          <div className="absolute inset-0 opacity-60">
+          <div className="absolute inset-0">
+            {Array.from({ length: 45 }).map((_, i) => (
+              <div
+                key={i}
+                className="real-snow-flake"
+                style={{
+                  left: `${(i * 2.25) % 100}%`,
+                  width: `${3 + (i % 5) * 2.5}px`,
+                  height: `${3 + (i % 5) * 2.5}px`,
+                  animationDuration: `${3.5 + (i % 6) * 1.2}s`,
+                  animationDelay: `${(i % 10) * 0.4}s`,
+                  opacity: 0.4 + (i % 5) * 0.15,
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* リアル桜吹雪（3Dタンブリング花びら） */}
+        {currentWeather === 'sakura' && (
+          <div className="absolute inset-0">
             {Array.from({ length: 30 }).map((_, i) => (
               <div
                 key={i}
-                className="snow-flake"
+                className="real-sakura-petal"
                 style={{
                   left: `${(i * 3.3) % 100}%`,
-                  animationDuration: `${3 + (i % 5)}s`,
-                  animationDelay: `${(i % 8) * 0.4}s`,
-                  transform: `scale(${0.5 + (i % 4) * 0.25})`,
+                  transform: `scale(${0.6 + (i % 4) * 0.25})`,
+                  animationDuration: `${4.5 + (i % 5) * 1.2}s`,
+                  animationDelay: `${(i % 8) * 0.5}s`,
                 }}
-              >
-                ❄
-              </div>
+              />
             ))}
           </div>
         )}
 
-        {/* 桜吹雪 */}
-        {currentWeather === 'sakura' && (
-          <div className="absolute inset-0 opacity-50">
-            {Array.from({ length: 25 }).map((_, i) => (
-              <div
-                key={i}
-                className="sakura-petal"
-                style={{
-                  left: `${(i * 4) % 100}%`,
-                  animationDuration: `${4 + (i % 4)}s`,
-                  animationDelay: `${(i % 6) * 0.5}s`,
-                }}
-              >
-                🌸
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 紅葉 */}
+        {/* リアル紅葉（カエデ・イチョウ風） */}
         {currentWeather === 'autumn' && (
-          <div className="absolute inset-0 opacity-50">
-            {Array.from({ length: 20 }).map((_, i) => (
+          <div className="absolute inset-0">
+            {Array.from({ length: 24 }).map((_, i) => (
               <div
                 key={i}
-                className="sakura-petal"
+                className="real-autumn-leaf"
                 style={{
-                  left: `${(i * 5) % 100}%`,
-                  animationDuration: `${5 + (i % 4)}s`,
-                  animationDelay: `${(i % 5) * 0.6}s`,
+                  left: `${(i * 4.1) % 100}%`,
+                  transform: `scale(${0.7 + (i % 4) * 0.25})`,
+                  animationDuration: `${5.2 + (i % 4) * 1.5}s`,
+                  animationDelay: `${(i % 7) * 0.6}s`,
                 }}
-              >
-                🍁
-              </div>
+              />
             ))}
           </div>
         )}
 
-        {/* 夜の星空 */}
-        {currentTimeOfDay === 'night' && (
-          <div className="absolute inset-0 opacity-30">
-            {Array.from({ length: 30 }).map((_, i) => (
+        {/* 晴れ・太陽光の微粒子（サンモート） */}
+        {currentWeather === 'sunny' && currentTimeOfDay !== 'night' && (
+          <div className="absolute inset-0">
+            {sunMotes.map((mote) => (
               <div
-                key={i}
-                className="absolute text-yellow-200 animate-pulse text-xs"
+                key={mote.id}
+                className="real-sun-mote"
                 style={{
-                  top: `${(i * 7) % 80}%`,
-                  left: `${(i * 11) % 100}%`,
-                  animationDuration: `${1.5 + (i % 3)}s`,
+                  top: mote.top,
+                  left: mote.left,
+                  width: mote.size,
+                  height: mote.size,
+                  animationDuration: mote.duration,
+                  animationDelay: mote.delay,
                 }}
-              >
-                ✨
-              </div>
+              />
             ))}
           </div>
         )}
       </div>
 
-      {/* 2. コントロールUI（最前面 z-50、ポインターイベント有効） */}
+      {/* =========================================================
+          2. コントロールUI（最前面 z-50、直感的な設定ポップアップ）
+          ========================================================= */}
       <div className="fixed bottom-5 right-5 z-50 pointer-events-auto select-none">
         <div className="relative">
           {/* 地球儀ボタン */}
@@ -253,124 +510,162 @@ export const WeatherBackground: React.FC = () => {
             type="button"
             onClick={() => setIsOpenControl(!isOpenControl)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-2 border-amber-400 text-amber-950 dark:text-amber-100 font-black text-xs shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer ring-2 ring-amber-300/50"
-            title="リアルタイム背景・地域設定（全都道府県・世界都市）"
+            title="リアル空＆天候コントロール"
           >
-            <Globe size={18} className="text-amber-600 animate-spin" style={{ animationDuration: '20s' }} />
+            <Globe size={18} className="text-amber-600 animate-spin" style={{ animationDuration: '25s' }} />
             <span className="font-bold">{selectedLocation.name.split(' ')[0]}</span>
-            <span className="text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded-full font-bold">
-              {currentTimeOfDay === 'morning'
-                ? '🌅 朝'
-                : currentTimeOfDay === 'day'
-                ? '☀️ 昼'
-                : currentTimeOfDay === 'evening'
-                ? '🌇 夕方'
-                : '🌙 夜'}
+            <span className="text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+              {currentTimeOfDay === 'morning' && <Sun size={10} className="text-orange-500" />}
+              {currentTimeOfDay === 'day' && <Sun size={10} className="text-amber-500" />}
+              {currentTimeOfDay === 'evening' && <Sun size={10} className="text-rose-500" />}
+              {currentTimeOfDay === 'night' && <Moon size={10} className="text-indigo-400" />}
+              <span>
+                {currentTimeOfDay === 'morning'
+                  ? '朝'
+                  : currentTimeOfDay === 'day'
+                  ? '昼'
+                  : currentTimeOfDay === 'evening'
+                  ? '夕方'
+                  : '夜'}
+              </span>
             </span>
             <Sliders size={14} className="text-slate-400" />
           </button>
 
           {/* コントロールポップアップ */}
           {isOpenControl && (
-            <div className="absolute bottom-14 right-0 w-80 max-h-[80vh] overflow-y-auto bg-white/98 dark:bg-slate-900/98 backdrop-blur-xl rounded-3xl p-5 border-4 border-amber-300 shadow-2xl space-y-4 animate-drop text-slate-800 dark:text-slate-100">
+            <div className="absolute bottom-14 right-0 w-84 max-h-[85vh] overflow-y-auto bg-white/98 dark:bg-slate-900/98 backdrop-blur-2xl rounded-3xl p-5 border-4 border-amber-300 shadow-2xl space-y-4 animate-drop text-slate-800 dark:text-slate-100">
               <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-1.5">
-                  <Globe size={16} className="text-amber-500" />
-                  <span className="text-xs font-black">リアルタイム背景・地域設定</span>
+                  <Sparkles size={16} className="text-amber-500" />
+                  <span className="text-xs font-black">SSS品質 リアル空・天候エンジン</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsOpenControl(false)}
-                  className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold"
+                  className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
-                  ✕
+                  <X size={16} />
                 </button>
               </div>
 
-              {/* 地域選択（全都道府県 ＆ 世界主要都市） */}
-              <div>
-                <label className="block text-[11px] font-black text-slate-600 dark:text-slate-300 mb-1.5">
-                  地域を選択 (日本47都道府県 ＆ 世界都市)
-                </label>
-                <select
-                  value={selectedLocation.id}
-                  onChange={(e) => {
-                    const found = LOCATIONS.find((l) => l.id === e.target.value);
-                    if (found) handleSelectLocation(found);
-                  }}
-                  className="w-full px-3 py-2.5 rounded-xl border-2 border-amber-200 bg-slate-50 dark:bg-slate-800 text-xs font-bold focus:outline-none focus:border-amber-500 cursor-pointer"
-                >
-                  <optgroup label="🇯🇵 日本の地域（47都道府県）">
-                    {LOCATIONS.filter((l) => l.country === '日本').map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="🌍 世界の都市">
-                    {LOCATIONS.filter((l) => l.country !== '日本').map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
-
-              {/* 天気手動切替 */}
-              <div>
-                <label className="block text-[11px] font-black text-slate-600 dark:text-slate-300 mb-1.5">
-                  天候エフェクト
-                </label>
-                <div className="grid grid-cols-3 gap-1.5 text-xs font-bold">
-                  {[
-                    { type: 'sunny', label: '晴れ ☀️' },
-                    { type: 'rain', label: '雨 🌧️' },
-                    { type: 'snow', label: '雪 ❄️' },
-                    { type: 'sakura', label: '桜吹雪 🌸' },
-                    { type: 'autumn', label: '紅葉 🍁' },
-                    { type: 'cloudy', label: '曇り ☁️' },
-                  ].map((w) => (
+              {/* 手動切り替え（タイムワープ） */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500">空の時間帯を選ぶ</span>
+                  {isManualOverride && (
                     <button
-                      key={w.type}
-                      type="button"
-                      onClick={() => setCurrentWeather(w.type as WeatherType)}
-                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
-                        currentWeather === w.type
-                          ? 'bg-amber-500 text-white font-black border-amber-600 shadow-sm'
-                          : 'bg-slate-50 dark:bg-slate-800 hover:bg-amber-50 border-slate-200 dark:border-slate-700'
-                      }`}
+                      onClick={() => {
+                        setIsManualOverride(false);
+                        updateTimeAndWeather(selectedLocation);
+                      }}
+                      className="text-[10px] text-amber-600 font-bold flex items-center gap-0.5 hover:underline"
                     >
-                      {w.label}
+                      <RotateCcw size={10} />
+                      <span>現在時刻に戻す</span>
                     </button>
-                  ))}
+                  )}
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {(
+                    [
+                      { id: 'morning', label: '朝焼け', icon: Sun, color: 'text-orange-500' },
+                      { id: 'day', label: '青空', icon: Sun, color: 'text-amber-500' },
+                      { id: 'evening', label: '夕焼け', icon: Sun, color: 'text-rose-500' },
+                      { id: 'night', label: '星空 (夜)', icon: Moon, color: 'text-indigo-400' },
+                    ] as const
+                  ).map((t) => {
+                    const Icon = t.icon;
+                    const isSelected = currentTimeOfDay === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          setCurrentTimeOfDay(t.id);
+                          setIsManualOverride(true);
+                        }}
+                        className={`p-2 rounded-xl text-center flex flex-col items-center gap-1 transition-all ${
+                          isSelected
+                            ? 'bg-amber-500 text-white font-black shadow-md scale-102'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-amber-100'
+                        }`}
+                      >
+                        <Icon size={14} className={isSelected ? 'text-white' : t.color} />
+                        <span className="text-[10px] font-bold">{t.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* 時間帯手動切替 */}
-              <div>
-                <label className="block text-[11px] font-black text-slate-600 dark:text-slate-300 mb-1.5">
-                  時間帯
-                </label>
-                <div className="grid grid-cols-4 gap-1.5 text-xs font-bold">
-                  {(['morning', 'day', 'evening', 'night'] as TimeOfDay[]).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setCurrentTimeOfDay(t)}
-                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
-                        currentTimeOfDay === t
-                          ? 'bg-amber-500 text-white font-black border-amber-600 shadow-sm'
-                          : 'bg-slate-50 dark:bg-slate-800 hover:bg-amber-50 border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
-                      {t === 'morning' ? '朝 🌅' : t === 'day' ? '昼 ☀️' : t === 'evening' ? '夕 🌇' : '夜 🌙'}
-                    </button>
-                  ))}
+              {/* 天候エフェクトセレクター */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-slate-500">天候エフェクトを選ぶ</span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(
+                    [
+                      { id: 'sunny', label: '快晴・光', icon: Sun, color: 'text-amber-500' },
+                      { id: 'cloudy', label: '雲海', icon: Cloud, color: 'text-slate-400' },
+                      { id: 'rain', label: '雨 ＆ 雷', icon: CloudRain, color: 'text-sky-500' },
+                      { id: 'snow', label: '粉雪', icon: Snowflake, color: 'text-cyan-400' },
+                      { id: 'sakura', label: '桜吹雪', icon: Flower2, color: 'text-pink-500' },
+                      { id: 'autumn', label: '紅葉', icon: Leaf, color: 'text-orange-600' },
+                    ] as const
+                  ).map((w) => {
+                    const Icon = w.icon;
+                    const isSelected = currentWeather === w.id;
+                    return (
+                      <button
+                        key={w.id}
+                        type="button"
+                        onClick={() => {
+                          setCurrentWeather(w.id);
+                          setIsManualOverride(true);
+                        }}
+                        className={`p-2 rounded-xl text-center flex flex-col items-center gap-1 transition-all ${
+                          isSelected
+                            ? 'bg-amber-500 text-white font-black shadow-md scale-102'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-amber-100'
+                        }`}
+                      >
+                        <Icon size={14} className={isSelected ? 'text-white' : w.color} />
+                        <span className="text-[10px] font-bold">{w.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-[10px] text-slate-400 text-center font-bold">
-                ※選択した地域の時間帯・天候がリアルタイムに教室の背景に反映されます。
+              {/* 都道府県・世界都市の選択 */}
+              <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500">地域でリアルタイム連動</span>
+                  <span className="text-[10px] text-slate-400">{LOCATIONS.length}都市</span>
+                </div>
+                <div className="max-h-40 overflow-y-auto space-y-1 pr-1 border rounded-xl p-1 bg-slate-50 dark:bg-slate-800/50">
+                  {LOCATIONS.map((loc) => {
+                    const isSelected = selectedLocation.id === loc.id;
+                    return (
+                      <button
+                        key={loc.id}
+                        type="button"
+                        onClick={() => handleSelectLocation(loc)}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition-colors ${
+                          isSelected
+                            ? 'bg-amber-500 text-white font-black'
+                            : 'hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="text-[10px] opacity-75">{loc.country === '日本' ? '🇯🇵' : '🌍'}</span>
+                          <span className="truncate">{loc.name}</span>
+                        </div>
+                        {isSelected && <Check size={12} className="flex-shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}

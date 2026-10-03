@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fdfbf7;
+  --foreground: #2d3748;
+  --chalkboard: #1b382b;
+  --chalkboard-border: #8b5a2b;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  min-height: 100vh;
+}
+
+/* 黒板風コンポーネント用スタイル */
+.chalkboard-bg {
+  background-color: #1b382b;
+  background-image: radial-gradient(#2d5542 1px, transparent 1px), radial-gradient(#152e23 1px, #1b382b 1px);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.5);
+  border: 10px solid #8b5a2b;
+  border-radius: 12px;
+}
+
+.chalk-text {
+  color: #f7fafc;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.4), 0 0 5px rgba(255, 255, 255, 0.2);
+}
+
+.chalk-text-yellow {
+  color: #fef08a;
+  text-shadow: 1px 1px 2px rgba(254, 240, 138, 0.4);
+}
+
+.chalk-text-pink {
+  color: #fbcfe8;
+  text-shadow: 1px 1px 2px rgba(251, 207, 232, 0.4);
+}
+
+.chalk-border {
+  border: 2px dashed rgba(255, 255, 255, 0.5);
+}
+
+/* カプセルのアニメーション */
+@keyframes shake {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg) scale(1.05); }
+  75% { transform: rotate(10deg) scale(1.05); }
+}
+
+.animate-shake {
+  animation: shake 0.3s ease-in-out infinite;
+}
+
+@keyframes drop {
+  0% { transform: translateY(-50px) scale(0.5); opacity: 0; }
+  60% { transform: translateY(10px) scale(1.1); opacity: 1; }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.animate-drop {
+  animation: drop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* 心拍パルス（溜め演出用） */
+@keyframes heartbeat {
+  0% { transform: scale(1); }
+  14% { transform: scale(1.18); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.28); }
+  70% { transform: scale(1); }
+}
+
+.animate-heartbeat {
+  animation: heartbeat 1.2s ease-in-out infinite;
+}
+
+/* 激震（爆発前） */
+@keyframes super-vibrate {
+  0% { transform: translate(0); }
+  20% { transform: translate(-3px, 3px) rotate(-2deg); }
+  40% { transform: translate(-3px, -3px) rotate(2deg); }
+  60% { transform: translate(3px, 3px) rotate(-1deg); }
+  80% { transform: translate(3px, -3px) rotate(1deg); }
+  100% { transform: translate(0); }
+}
+
+.animate-super-vibrate {
+  animation: super-vibrate 0.1s linear infinite;
+}
+
+/* 回転サンバースト（光線） */
+@keyframes spin-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 15s linear infinite;
+}
+
+/* 天候エフェクト */
+.rain-container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.rain-drop {
+  position: absolute;
+  top: -20px;
+  width: 2px;
+  height: 25px;
+  background: linear-gradient(transparent, rgba(14, 165, 233, 0.7));
+  animation: rain-fall linear infinite;
+}
+
+@keyframes rain-fall {
+  0% { transform: translateY(-30px); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(110vh); opacity: 0; }
+}
+
+.snow-flake {
+  position: absolute;
+  top: -20px;
+  color: #bae6fd;
+  font-size: 16px;
+  user-select: none;
+  animation: snow-fall linear infinite;
+}
+
+@keyframes snow-fall {
+  0% { transform: translateY(-30px) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.9; }
+  90% { opacity: 0.9; }
+  100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+}
+
+.sakura-petal {
+  position: absolute;
+  top: -20px;
+  font-size: 18px;
+  user-select: none;
+  animation: sakura-fall linear infinite;
+}
+
+@keyframes sakura-fall {
+  0% { transform: translateY(-30px) translateX(0) rotate(0deg); opacity: 0; }
+  20% { opacity: 0.9; transform: translateY(20vh) translateX(30px) rotate(90deg); }
+  50% { transform: translateY(50vh) translateX(-20px) rotate(180deg); }
+  80% { opacity: 0.9; transform: translateY(80vh) translateX(40px) rotate(270deg); }
+  100% { transform: translateY(110vh) translateX(10px) rotate(360deg); opacity: 0; }
+}
